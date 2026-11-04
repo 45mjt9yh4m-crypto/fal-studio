@@ -63,6 +63,9 @@ details summary{cursor:pointer;color:var(--muted);font-size:14px}
 details textarea{min-height:80px;margin-top:8px}
 .go{background:var(--accent);color:var(--accent-ink);border:0;border-radius:14px;padding:15px;font:700 17px var(--display);letter-spacing:-.01em}
 .go:disabled{opacity:.5}
+.price{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin:0;font-size:14px;color:var(--muted)}
+.price b{font:500 18px var(--mono);color:var(--fg);white-space:nowrap}
+.price small{font:12px var(--mono);color:var(--muted)}
 .hint{font-size:13px;color:var(--muted);margin:0}
 .err{color:var(--err);font-size:14px;margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
 .jobs{display:flex;flex-direction:column;gap:12px}
@@ -133,6 +136,7 @@ details textarea{min-height:80px;margin-top:8px}
       <textarea id="extra" class="mono" placeholder='{"seed": 42}' autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
     </details>
     <p class="err" id="formErr" hidden></p>
+    <p class="price" id="price"><span id="priceTxt">Costo stimato</span><b id="priceVal">…</b></p>
     <button class="go" id="go" type="submit">Genera</button>
     <p class="hint" id="modelHint"></p>
   </form>
@@ -170,7 +174,7 @@ const MODELS = {
   image: [
     {id:"nano", name:"Nano Banana (Google) · modifica foto", t:"fal-ai/nano-banana", ref:"fal-ai/nano-banana/edit",
       build:(f)=> f.image ? {prompt:f.prompt, image_urls:[f.image], num_images:1} : {prompt:f.prompt, num_images:1}},
-    {id:"flux-ultra", name:"FLUX 1.1 Pro Ultra · alta qualità", t:"fal-ai/flux-pro/v1.1-ultra",
+    {id:"flux-ultra", name:"FLUX 1.1 Pro Ultra · alta qualità", t:"fal-ai/flux-pro/v1.1-ultra", mp:4,
       build:(f)=>({prompt:f.prompt, aspect_ratio:f.ratio, num_images:1})},
     {id:"flux-schnell", name:"FLUX Schnell · veloce ed economico", t:"fal-ai/flux/schnell",
       build:(f)=>({prompt:f.prompt, image_size:RATIO_SIZE[f.ratio]||"square_hd", num_images:1})},
@@ -213,7 +217,7 @@ function renderKey(){ $("keyDot").classList.toggle("on", !!key); $("keyLbl").tex
 $("openKey").onclick = ()=>{ $("key").value = key; $("sheet").hidden = false; };
 $("keyCancel").onclick = ()=>{ $("sheet").hidden = true; };
 $("sheet").onclick = (e)=>{ if(e.target.id==="sheet") $("sheet").hidden = true; };
-$("keySave").onclick = ()=>{ key = $("key").value.trim(); store.set("falKey",key); renderKey(); $("sheet").hidden = true; toast(key?"Chiave salvata":"Nessuna chiave"); };
+$("keySave").onclick = ()=>{ key = $("key").value.trim(); store.set("falKey",key); renderKey(); updatePrice(); $("sheet").hidden = true; toast(key?"Chiave salvata":"Nessuna chiave"); };
 $("keyDel").onclick = ()=>{ key=""; store.set("falKey",""); $("key").value=""; renderKey(); toast("Chiave rimossa"); };
 
 /* ---------- Composer ---------- */
@@ -240,11 +244,59 @@ function renderForm(){
   else if(state.image) hint = "Userà la tua immagine come partenza ("+p.ref+").";
   else hint = p.t;
   $("modelHint").textContent = hint;
+  updatePrice();
+}
+
+/* ---------- Price estimate (fal Platform API: /v1/models/pricing) ---------- */
+function currentEndpoint(){
+  const p = preset();
+  if(p.id==="custom") return $("custom").value.trim().replace(/^https?:\/\/(fal\.ai\/models\/|queue\.fal\.run\/|fal\.run\/)/,"").replace(/\/+$/,"");
+  return (state.image && p.ref) ? p.ref : (p.t || p.ref);
+}
+const priceCache = {};
+async function unitPrice(endpoint){
+  if(priceCache[endpoint]) return priceCache[endpoint];
+  const r = await fetch("https://api.fal.ai/v1/models/pricing?endpoint_id="+encodeURIComponent(endpoint), {headers:{"Authorization":"Key "+key}});
+  if(!r.ok) throw new Error(r.status);
+  const d = await r.json();
+  const pr = (d.prices||[]).find(x=>x.endpoint_id===endpoint) || (d.prices||[])[0];
+  if(!pr || pr.unit_price==null) throw new Error("nessun prezzo");
+  return priceCache[endpoint] = pr;
+}
+const money = (v)=> "$" + (v<0.1 ? v.toFixed(3) : v.toFixed(2));
+let currentCost = null, priceSeq = 0;
+async function updatePrice(){
+  const seq = ++priceSeq, endpoint = currentEndpoint(), p = preset();
+  const txt=$("priceTxt"), val=$("priceVal");
+  currentCost = null; $("go").textContent = "Genera";
+  if(!key){ txt.textContent="Collega fal.ai per vedere il prezzo"; val.textContent=""; return; }
+  if(!endpoint){ txt.textContent="Costo stimato"; val.textContent="—"; return; }
+  txt.textContent="Calcolo il prezzo…"; val.textContent="…";
+  try{
+    const pr = await unitPrice(endpoint);
+    if(seq!==priceSeq) return;
+    const unit = (pr.unit||"").toLowerCase(), u = Number(pr.unit_price);
+    let qty = 1, how = "", approx = false;
+    if(unit.includes("second")){ qty = Number(state.mode==="video" ? state.dur : 1) || 5; how = `${money(u)} al secondo × ${qty} s`; approx = !(p.durs); }
+    else if(unit.includes("megapixel")){ qty = p.mp || 1; approx = true; how = `${money(u)} a megapixel × ~${qty} MP`; }
+    else if(unit.includes("image")){ how = `${money(u)} a immagine`; }
+    else if(unit.includes("video")){ how = `${money(u)} a video`; }
+    else { how = `${money(u)} per ${pr.unit||"richiesta"}`; approx = true; }
+    currentCost = u*qty;
+    txt.innerHTML = ""; txt.append("Costo stimato"); const sm=document.createElement("small"); sm.textContent = " · "+how; txt.append(sm);
+    val.textContent = (approx?"≈ ":"") + money(currentCost) + (pr.currency && pr.currency!=="USD" ? " "+pr.currency : "");
+    $("go").textContent = "Genera · " + (approx?"≈ ":"") + money(currentCost);
+  }catch{
+    if(seq!==priceSeq) return;
+    txt.innerHTML = `Prezzo non disponibile · <a style="color:var(--accent)" target="_blank" rel="noopener" href="https://fal.ai/models/${encodeURI(endpoint)}">vedi su fal.ai</a>`;
+    val.textContent = "?";
+  }
 }
 $("modeImg").onclick = ()=>{ state.mode="image"; store.set("mode","image"); renderForm(); };
 $("modeVid").onclick = ()=>{ state.mode="video"; store.set("mode","video"); renderForm(); };
 $("model").onchange = (e)=>{ state.model[state.mode]=e.target.value; store.set("modelSel",state.model); renderForm(); };
-$("custom").oninput = (e)=> store.set("custom_"+state.mode, e.target.value.trim());
+let priceTimer;
+$("custom").oninput = (e)=>{ store.set("custom_"+state.mode, e.target.value.trim()); clearTimeout(priceTimer); priceTimer=setTimeout(updatePrice,600); };
 
 /* Reference image: shrink to max 1536px JPEG and send as data URI (fal accepts data URIs). */
 $("pick").onclick = ()=> $("file").click();
@@ -305,14 +357,14 @@ $("form").onsubmit = async (e)=>{
   const f = {prompt, ratio:state.ratio[state.mode], dur:state.dur, image: p.ref||p.id==="custom" ? state.image : null};
   let endpoint, input;
   if(p.id==="custom"){
-    endpoint = $("custom").value.trim().replace(/^https?:\/\/(fal\.ai\/models\/|queue\.fal\.run\/|fal\.run\/)/,"").replace(/\/+$/,"");
+    endpoint = currentEndpoint();
     if(!endpoint){ err.textContent="Inserisci l'ID del modello."; err.hidden=false; return; }
     input = {prompt, aspect_ratio:f.ratio};
     if(state.mode==="video") input.duration = state.dur;
     if(f.image){ input.image_url = f.image; }
   } else {
     if(p.needsImage && !f.image){ err.textContent="Questo modello ha bisogno di una foto di partenza: sceglila dal Rullino."; err.hidden=false; return; }
-    endpoint = f.image && p.ref ? p.ref : p.t;
+    endpoint = currentEndpoint();
     input = p.build(f);
   }
   const extraTxt = $("extra").value.trim();
@@ -322,7 +374,7 @@ $("form").onsubmit = async (e)=>{
   try{
     const sub = await fal("https://queue.fal.run/"+endpoint, {method:"POST", body:JSON.stringify(input)});
     const job = {id:sub.request_id, endpoint, mode:state.mode, prompt, created:Date.now(), status:"IN_QUEUE",
-      status_url:sub.status_url, response_url:sub.response_url, cancel_url:sub.cancel_url, media:[]};
+      cost:currentCost, status_url:sub.status_url, response_url:sub.response_url, cancel_url:sub.cancel_url, media:[]};
     jobs.unshift(job); save(); renderJobs(); poll(job);
     toast("Inviato a fal.ai");
   }catch(ex){ err.textContent = ex.message; err.hidden=false; }
@@ -385,7 +437,7 @@ function renderJob(j){
       </div>
     </div>`;
   el.querySelector(".p").textContent = j.prompt;
-  el.querySelector(".tag").textContent = j.endpoint;
+  el.querySelector(".tag").textContent = j.endpoint + (j.cost!=null ? " · ≈ "+money(j.cost) : "");
   if(j.error) el.querySelector(".err").textContent = j.error;
   el.querySelectorAll("[data-a]").forEach(b=> b.onclick = ()=> act(j, b.dataset.a));
 }
