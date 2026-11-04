@@ -43,6 +43,10 @@ button{font:inherit;color:inherit;cursor:pointer}
 .icon-btn{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 12px;display:flex;align-items:center;gap:6px;font-size:14px}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--err)}
 .dot.on{background:var(--ok)}
+.bal{display:flex;justify-content:space-between;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:10px 14px;font-size:14px;color:var(--muted)}
+.bal b{font:500 20px var(--mono);color:var(--fg)}
+.bal.low b{color:var(--err)}
+.warn{color:var(--err);font-size:13px;margin:0}
 .seg{display:grid;grid-template-columns:1fr 1fr;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:4px}
 .seg button{border:0;background:none;padding:10px;border-radius:10px;font-weight:600;color:var(--muted)}
 .seg button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
@@ -99,6 +103,11 @@ details textarea{min-height:80px;margin-top:8px}
     <button class="icon-btn" id="openKey" type="button"><span class="dot" id="keyDot"></span><span id="keyLbl">Chiave API</span></button>
   </header>
 
+  <div class="bal" id="bal" hidden>
+    <span>Credito fal.ai <button type="button" class="link" id="balRefresh" style="font-size:13px;margin-left:6px">Aggiorna</button></span>
+    <b id="balVal">…</b>
+  </div>
+
   <div class="seg" role="group" aria-label="Tipo">
     <button type="button" id="modeImg" aria-pressed="true">Immagine</button>
     <button type="button" id="modeVid" aria-pressed="false">Video</button>
@@ -137,6 +146,7 @@ details textarea{min-height:80px;margin-top:8px}
     </details>
     <p class="err" id="formErr" hidden></p>
     <p class="price" id="price"><span id="priceTxt">Costo stimato</span><b id="priceVal">…</b></p>
+    <p class="warn" id="balWarn" hidden></p>
     <button class="go" id="go" type="submit">Genera</button>
     <p class="hint" id="modelHint"></p>
   </form>
@@ -217,8 +227,8 @@ function renderKey(){ $("keyDot").classList.toggle("on", !!key); $("keyLbl").tex
 $("openKey").onclick = ()=>{ $("key").value = key; $("sheet").hidden = false; };
 $("keyCancel").onclick = ()=>{ $("sheet").hidden = true; };
 $("sheet").onclick = (e)=>{ if(e.target.id==="sheet") $("sheet").hidden = true; };
-$("keySave").onclick = ()=>{ key = $("key").value.trim(); store.set("falKey",key); renderKey(); updatePrice(); $("sheet").hidden = true; toast(key?"Chiave salvata":"Nessuna chiave"); };
-$("keyDel").onclick = ()=>{ key=""; store.set("falKey",""); $("key").value=""; renderKey(); toast("Chiave rimossa"); };
+$("keySave").onclick = ()=>{ key = $("key").value.trim(); store.set("falKey",key); renderKey(); updatePrice(); updateBalance(); $("sheet").hidden = true; toast(key?"Chiave salvata":"Nessuna chiave"); };
+$("keyDel").onclick = ()=>{ key=""; store.set("falKey",""); $("key").value=""; renderKey(); updateBalance(); toast("Chiave rimossa"); };
 
 /* ---------- Composer ---------- */
 function preset(){ return MODELS[state.mode].find(m=>m.id===state.model[state.mode]) || MODELS[state.mode][0]; }
@@ -246,6 +256,37 @@ function renderForm(){
   $("modelHint").textContent = hint;
   updatePrice();
 }
+
+/* ---------- Balance (fal Platform API: /v1/account/billing) ---------- */
+let balance = null;
+async function updateBalance(){
+  const box=$("bal"), v=$("balVal");
+  if(!key){ box.hidden=true; balance=null; checkAfford(); return; }
+  box.hidden=false; v.textContent="…";
+  try{
+    const r = await fetch("https://api.fal.ai/v1/account/billing?expand=credits", {headers:{"Authorization":"Key "+key}});
+    if(!r.ok) throw new Error(r.status);
+    const d = await r.json();
+    const c = d.credits || d;
+    const b = Number(c.current_balance ?? c.balance);
+    if(!isFinite(b)) throw new Error("formato");
+    balance = b;
+    v.textContent = "$" + b.toFixed(2) + (c.currency && c.currency!=="USD" ? " "+c.currency : "");
+    $("bal").classList.toggle("low", b < 1);
+  }catch{
+    balance = null;
+    v.innerHTML = '<a style="color:var(--accent);font-size:14px" target="_blank" rel="noopener" href="https://fal.ai/dashboard/billing">vedi su fal.ai</a>';
+  }
+  checkAfford();
+}
+function checkAfford(){
+  const w=$("balWarn");
+  if(balance!=null && currentCost!=null && currentCost > balance){
+    w.textContent = `Credito insufficiente: questa generazione costa circa ${money(currentCost)} e ti restano $${balance.toFixed(2)}.`;
+    w.hidden=false;
+  } else w.hidden=true;
+}
+$("balRefresh").onclick = updateBalance;
 
 /* ---------- Price estimate (fal Platform API: /v1/models/pricing) ---------- */
 function currentEndpoint(){
@@ -286,6 +327,7 @@ async function updatePrice(){
     txt.innerHTML = ""; txt.append("Costo stimato"); const sm=document.createElement("small"); sm.textContent = " · "+how; txt.append(sm);
     val.textContent = (approx?"≈ ":"") + money(currentCost) + (pr.currency && pr.currency!=="USD" ? " "+pr.currency : "");
     $("go").textContent = "Genera · " + (approx?"≈ ":"") + money(currentCost);
+    checkAfford();
   }catch{
     if(seq!==priceSeq) return;
     txt.innerHTML = `Prezzo non disponibile · <a style="color:var(--accent)" target="_blank" rel="noopener" href="https://fal.ai/models/${encodeURI(endpoint)}">vedi su fal.ai</a>`;
@@ -401,6 +443,7 @@ async function poll(job){
         if(!job.media.length) job.error = "Finito, ma non ho trovato immagini o video nella risposta.";
       }catch(ex){ job.status="FAILED"; job.error=ex.message; }
       save(); renderJob(job);
+      setTimeout(updateBalance, 3000);
     }
   } finally { polling.delete(job.id); }
 }
@@ -474,7 +517,8 @@ $("clearAll").onclick = ()=>{
 /* Live timers for running jobs */
 setInterval(()=> jobs.forEach(j=>{ if(j.status==="IN_QUEUE"||j.status==="IN_PROGRESS") renderJob(j); }), 1000);
 
-renderKey(); renderForm(); renderJobs();
+renderKey(); renderForm(); renderJobs(); updateBalance();
+document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) updateBalance(); });
 if(key) jobs.forEach(j=>{ if(j.status==="IN_QUEUE"||j.status==="IN_PROGRESS") poll(j); });
 </script>
 </body>
