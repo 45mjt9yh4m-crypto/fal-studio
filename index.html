@@ -1,0 +1,429 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Fal Studio</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Fal Studio">
+<meta name="theme-color" content="#0d0c10">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-512.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Figtree:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one column, composer on top, gallery of results below; settings in a bottom sheet. Dark-first darkroom look. */
+:root{
+  --bg:#0d0c10; --panel:#17151c; --line:#2a2731; --fg:#efeaf2; --muted:#9a93a3;
+  --accent:#ff9b5c; --accent-ink:#1a0e05; --ok:#7ad9a0; --err:#ff7a7a;
+  --display:"Bricolage Grotesque", "Avenir Next", system-ui, sans-serif;
+  --body:"Figtree", -apple-system, system-ui, sans-serif;
+  --mono:"JetBrains Mono", ui-monospace, Menlo, monospace;
+  color-scheme:dark;
+}
+@media (prefers-color-scheme: light){ :root{
+  --bg:#f6f3f7; --panel:#ffffff; --line:#e2dce6; --fg:#1b1820; --muted:#6c6574;
+  --accent:#e2611c; --accent-ink:#fff; --ok:#1f8a4c; --err:#c62f2f; color-scheme:light;
+}}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;background:var(--bg);color:var(--fg)}
+body{font:16px/1.45 var(--body);-webkit-font-smoothing:antialiased;
+  padding:calc(env(safe-area-inset-top,0px) + 12px) max(16px,env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 32px) max(16px,env(safe-area-inset-left,0px))}
+.wrap{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+h1{font:700 28px/1 var(--display);letter-spacing:-.02em;margin:0}
+h1 span{color:var(--accent)}
+h2{font:600 13px/1 var(--body);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:0}
+button{font:inherit;color:inherit;cursor:pointer}
+.icon-btn{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:8px 12px;display:flex;align-items:center;gap:6px;font-size:14px}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--err)}
+.dot.on{background:var(--ok)}
+.seg{display:grid;grid-template-columns:1fr 1fr;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:4px}
+.seg button{border:0;background:none;padding:10px;border-radius:10px;font-weight:600;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:14px}
+label{display:flex;flex-direction:column;gap:6px;font-size:14px;color:var(--muted)}
+select,textarea,input[type=text],input[type=password]{font:16px var(--body);color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px;width:100%}
+textarea{min-height:110px;resize:vertical}
+.mono{font-family:var(--mono);font-size:13px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chips button{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:7px 13px;font:500 14px var(--mono)}
+.chips button[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
+.ref{display:flex;gap:12px;align-items:center}
+.ref .thumb{width:64px;height:64px;border-radius:12px;border:1px dashed var(--line);background:var(--bg) center/cover no-repeat;flex:none}
+.ref .txt{min-width:0;flex:1;font-size:14px;color:var(--muted)}
+.link{background:none;border:0;padding:0;color:var(--accent);font-weight:600}
+details summary{cursor:pointer;color:var(--muted);font-size:14px}
+details textarea{min-height:80px;margin-top:8px}
+.go{background:var(--accent);color:var(--accent-ink);border:0;border-radius:14px;padding:15px;font:700 17px var(--display);letter-spacing:-.01em}
+.go:disabled{opacity:.5}
+.hint{font-size:13px;color:var(--muted);margin:0}
+.err{color:var(--err);font-size:14px;margin:0;white-space:pre-wrap;overflow-wrap:anywhere}
+.jobs{display:flex;flex-direction:column;gap:12px}
+.job{background:var(--panel);border:1px solid var(--line);border-radius:18px;overflow:hidden}
+.job .media{background:#000;display:grid;place-items:center;min-height:120px}
+.job .media img,.job .media video{width:100%;height:auto;display:block;max-height:70vh;object-fit:contain}
+.job .meta{padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+.job .p{margin:0;font-size:14px;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.job .row{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;justify-content:space-between}
+.job .tag{font:12px var(--mono);color:var(--muted);overflow-wrap:anywhere;min-width:0}
+.job .acts{display:flex;gap:14px}
+.status{font:500 13px var(--mono);color:var(--accent);display:flex;align-items:center;gap:8px}
+.spin{width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:s 1s linear infinite}
+@keyframes s{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion: reduce){.spin{animation:none}}
+.empty{text-align:center;color:var(--muted);font-size:14px;padding:24px 8px;border:1px dashed var(--line);border-radius:18px}
+.sheet{position:fixed;inset:0;background:rgb(0 0 0 / .55);display:flex;align-items:flex-end;z-index:20}
+.sheet .in{background:var(--panel);width:100%;max-width:640px;margin:0 auto;border-radius:22px 22px 0 0;
+  padding:20px max(16px,env(safe-area-inset-right,0px)) calc(env(safe-area-inset-bottom,0px) + 20px) max(16px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:14px}
+.sheet h3{font:700 22px var(--display);margin:0}
+.btns{display:flex;gap:10px}
+.btns button{flex:1;border-radius:12px;padding:12px;border:1px solid var(--line);background:var(--bg);font-weight:600}
+.btns .primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom,0px) + 20px);background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:12px;font-size:14px;z-index:30;max-width:calc(100% - 32px)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Fal<span>·</span>Studio</h1>
+    <button class="icon-btn" id="openKey" type="button"><span class="dot" id="keyDot"></span><span id="keyLbl">Chiave API</span></button>
+  </header>
+
+  <div class="seg" role="group" aria-label="Tipo">
+    <button type="button" id="modeImg" aria-pressed="true">Immagine</button>
+    <button type="button" id="modeVid" aria-pressed="false">Video</button>
+  </div>
+
+  <form class="card" id="form">
+    <label>Modello
+      <select id="model"></select>
+    </label>
+    <label id="customWrap" hidden>ID del modello su fal.ai
+      <input type="text" id="custom" class="mono" placeholder="fal-ai/nome-modello" autocapitalize="off" autocorrect="off" spellcheck="false">
+    </label>
+    <label>Cosa vuoi creare
+      <textarea id="prompt" placeholder="Un gatto astronauta che galleggia sopra Roma al tramonto, stile cinematografico"></textarea>
+    </label>
+    <div>
+      <h2 style="margin-bottom:8px">Formato</h2>
+      <div class="chips" id="ratios"></div>
+    </div>
+    <div id="durWrap" hidden>
+      <h2 style="margin-bottom:8px">Durata</h2>
+      <div class="chips" id="durs"></div>
+    </div>
+    <div class="ref">
+      <div class="thumb" id="thumb"></div>
+      <div class="txt">
+        <div id="refTxt">Immagine di partenza (facoltativa)</div>
+        <button type="button" class="link" id="pick">Scegli dal Rullino</button>
+        <button type="button" class="link" id="clearRef" hidden style="margin-left:12px;color:var(--muted)">Togli</button>
+        <input type="file" id="file" accept="image/*" hidden>
+      </div>
+    </div>
+    <details>
+      <summary>Parametri avanzati (JSON)</summary>
+      <textarea id="extra" class="mono" placeholder='{"seed": 42}' autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
+    </details>
+    <p class="err" id="formErr" hidden></p>
+    <button class="go" id="go" type="submit">Genera</button>
+    <p class="hint" id="modelHint"></p>
+  </form>
+
+  <section style="display:flex;flex-direction:column;gap:12px">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h2>Le tue creazioni</h2>
+      <button type="button" class="link" id="clearAll" style="font-size:14px;color:var(--muted)">Svuota</button>
+    </div>
+    <div class="jobs" id="jobs"></div>
+  </section>
+</div>
+
+<div class="sheet" id="sheet" hidden>
+  <div class="in" role="dialog" aria-labelledby="sheetT">
+    <h3 id="sheetT">Collega fal.ai</h3>
+    <p class="hint">Sul sito fal.ai vai su <b>Dashboard → API Keys</b>, crea una chiave e incollala qui. Resta salvata solo su questo telefono.</p>
+    <input type="password" id="key" class="mono" placeholder="xxxxxxxx-xxxx-…:xxxxxxxx" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <p class="hint"><a href="https://fal.ai/dashboard/keys" target="_blank" rel="noopener" style="color:var(--accent)">Apri le chiavi su fal.ai</a> · <a href="https://fal.ai/dashboard/billing" target="_blank" rel="noopener" style="color:var(--accent)">Vedi il credito</a></p>
+    <div class="btns">
+      <button type="button" id="keyCancel">Chiudi</button>
+      <button type="button" id="keySave" class="primary">Salva</button>
+    </div>
+    <button type="button" class="link" id="keyDel" style="color:var(--err);align-self:flex-start">Rimuovi la chiave</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+/* ---------- Models ----------
+   Each preset knows its endpoint(s) and how to turn the form into the model's input.
+   "ref" = endpoint used when a starting image is chosen. */
+const RATIO_SIZE = {"1:1":"square_hd","16:9":"landscape_16_9","9:16":"portrait_16_9","4:3":"landscape_4_3","3:4":"portrait_4_3"};
+const MODELS = {
+  image: [
+    {id:"nano", name:"Nano Banana (Google) · modifica foto", t:"fal-ai/nano-banana", ref:"fal-ai/nano-banana/edit",
+      build:(f)=> f.image ? {prompt:f.prompt, image_urls:[f.image], num_images:1} : {prompt:f.prompt, num_images:1}},
+    {id:"flux-ultra", name:"FLUX 1.1 Pro Ultra · alta qualità", t:"fal-ai/flux-pro/v1.1-ultra",
+      build:(f)=>({prompt:f.prompt, aspect_ratio:f.ratio, num_images:1})},
+    {id:"flux-schnell", name:"FLUX Schnell · veloce ed economico", t:"fal-ai/flux/schnell",
+      build:(f)=>({prompt:f.prompt, image_size:RATIO_SIZE[f.ratio]||"square_hd", num_images:1})},
+    {id:"custom", name:"Altro modello…"}
+  ],
+  video: [
+    {id:"kling4", name:"Kling 4.0 · novità", t:"kling/v4/text-to-video", ref:"kling/v4/image-to-video",
+      durs:["5","10"], build:(f)=> f.image ? {prompt:f.prompt, image_url:f.image, duration:f.dur} : {prompt:f.prompt, aspect_ratio:f.ratio, duration:f.dur}},
+    {id:"h3max", name:"MiniMax H3 Max · novità", t:"minimax/h3-max/text-to-video", ref:"minimax/h3-max/image-to-video",
+      build:(f)=> f.image ? {prompt:f.prompt, image_url:f.image} : {prompt:f.prompt, aspect_ratio:f.ratio}},
+    {id:"flux3v", name:"FLUX 3 Max · anima una foto", ref:"blackforestlabs/flux-3-max/image-to-video", needsImage:true,
+      build:(f)=>({prompt:f.prompt, image_url:f.image})},
+    {id:"kling", name:"Kling 2.1 Master", t:"fal-ai/kling-video/v2.1/master/text-to-video", ref:"fal-ai/kling-video/v2.1/master/image-to-video",
+      durs:["5","10"], build:(f)=> f.image ? {prompt:f.prompt, image_url:f.image, duration:f.dur} : {prompt:f.prompt, aspect_ratio:f.ratio, duration:f.dur}},
+    {id:"seedance", name:"Seedance 1 Pro (ByteDance)", t:"fal-ai/bytedance/seedance/v1/pro/text-to-video", ref:"fal-ai/bytedance/seedance/v1/pro/image-to-video",
+      durs:["5","10"], build:(f)=> f.image ? {prompt:f.prompt, image_url:f.image, duration:f.dur} : {prompt:f.prompt, aspect_ratio:f.ratio, duration:f.dur}},
+    {id:"veo-fast", name:"Veo 3 Fast (Google) · con audio", t:"fal-ai/veo3/fast",
+      build:(f)=>({prompt:f.prompt, aspect_ratio:f.ratio})},
+    {id:"custom", name:"Altro modello…"}
+  ]
+};
+const RATIOS = {image:["1:1","9:16","16:9","3:4","4:3"], video:["9:16","16:9","1:1"]};
+
+/* ---------- Storage (wrapped: Safari private mode can throw) ---------- */
+const store = {
+  get(k,d){ try{ const v=localStorage.getItem(k); return v==null?d:JSON.parse(v); }catch{ return d; } },
+  set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch{} }
+};
+let key = store.get("falKey","");
+let jobs = store.get("jobs",[]);
+let state = {mode:store.get("mode","image"), model:{}, ratio:{}, dur:"5", image:null};
+state.model = store.get("modelSel",{image:"nano",video:"kling4"});
+state.ratio = {image:"1:1", video:"9:16"};
+
+const $ = (id)=>document.getElementById(id);
+const toast = (msg)=>{ const t=document.createElement("div"); t.className="toast"; t.textContent=msg; document.body.append(t); setTimeout(()=>t.remove(),2600); };
+
+/* ---------- Key sheet ---------- */
+function renderKey(){ $("keyDot").classList.toggle("on", !!key); $("keyLbl").textContent = key ? "Collegato" : "Collega fal.ai"; }
+$("openKey").onclick = ()=>{ $("key").value = key; $("sheet").hidden = false; };
+$("keyCancel").onclick = ()=>{ $("sheet").hidden = true; };
+$("sheet").onclick = (e)=>{ if(e.target.id==="sheet") $("sheet").hidden = true; };
+$("keySave").onclick = ()=>{ key = $("key").value.trim(); store.set("falKey",key); renderKey(); $("sheet").hidden = true; toast(key?"Chiave salvata":"Nessuna chiave"); };
+$("keyDel").onclick = ()=>{ key=""; store.set("falKey",""); $("key").value=""; renderKey(); toast("Chiave rimossa"); };
+
+/* ---------- Composer ---------- */
+function preset(){ return MODELS[state.mode].find(m=>m.id===state.model[state.mode]) || MODELS[state.mode][0]; }
+function renderForm(){
+  $("modeImg").setAttribute("aria-pressed", state.mode==="image");
+  $("modeVid").setAttribute("aria-pressed", state.mode==="video");
+  const sel = $("model"); sel.innerHTML = "";
+  for(const m of MODELS[state.mode]){ const o=document.createElement("option"); o.value=m.id; o.textContent=m.name; sel.append(o); }
+  sel.value = preset().id;
+  const p = preset();
+  $("customWrap").hidden = p.id!=="custom";
+  $("custom").value = store.get("custom_"+state.mode,"");
+  const rs = $("ratios"); rs.innerHTML="";
+  for(const r of RATIOS[state.mode]){ const b=document.createElement("button"); b.type="button"; b.textContent=r; b.setAttribute("aria-pressed", state.ratio[state.mode]===r); b.onclick=()=>{state.ratio[state.mode]=r; renderForm();}; rs.append(b); }
+  const durs = p.durs || null;
+  $("durWrap").hidden = !durs;
+  if(durs){ if(!durs.includes(state.dur)) state.dur=durs[0]; const ds=$("durs"); ds.innerHTML="";
+    for(const d of durs){ const b=document.createElement("button"); b.type="button"; b.textContent=d+" s"; b.setAttribute("aria-pressed", state.dur===d); b.onclick=()=>{state.dur=d; renderForm();}; ds.append(b); } }
+  let hint = "";
+  if(p.id==="custom") hint = "Apri il modello su fal.ai: l'ID è la parte dopo fal.ai/models/ nell'indirizzo. Se servono altri campi, mettili nei parametri avanzati.";
+  else if(state.image && !p.ref) hint = "Questo modello non usa l'immagine di partenza: verrà ignorata.";
+  else if(p.needsImage && !state.image) hint = "Questo modello parte da una foto: sceglila dal Rullino qui sopra.";
+  else if(state.image) hint = "Userà la tua immagine come partenza ("+p.ref+").";
+  else hint = p.t;
+  $("modelHint").textContent = hint;
+}
+$("modeImg").onclick = ()=>{ state.mode="image"; store.set("mode","image"); renderForm(); };
+$("modeVid").onclick = ()=>{ state.mode="video"; store.set("mode","video"); renderForm(); };
+$("model").onchange = (e)=>{ state.model[state.mode]=e.target.value; store.set("modelSel",state.model); renderForm(); };
+$("custom").oninput = (e)=> store.set("custom_"+state.mode, e.target.value.trim());
+
+/* Reference image: shrink to max 1536px JPEG and send as data URI (fal accepts data URIs). */
+$("pick").onclick = ()=> $("file").click();
+$("file").onchange = async (e)=>{
+  const f = e.target.files[0]; if(!f) return;
+  try{
+    const bmp = await createImageBitmap(f);
+    const s = Math.min(1, 1536/Math.max(bmp.width,bmp.height));
+    const c = document.createElement("canvas"); c.width=Math.round(bmp.width*s); c.height=Math.round(bmp.height*s);
+    c.getContext("2d").drawImage(bmp,0,0,c.width,c.height);
+    state.image = c.toDataURL("image/jpeg",0.9);
+    $("thumb").style.backgroundImage = `url(${state.image})`;
+    $("refTxt").textContent = `Immagine pronta (${c.width}×${c.height})`;
+    $("clearRef").hidden = false;
+  }catch{ toast("Non riesco a leggere questa immagine"); }
+  e.target.value = ""; renderForm();
+};
+$("clearRef").onclick = ()=>{ state.image=null; $("thumb").style.backgroundImage=""; $("refTxt").textContent="Immagine di partenza (facoltativa)"; $("clearRef").hidden=true; renderForm(); };
+
+/* ---------- fal queue API ---------- */
+async function fal(url, opts={}){
+  const r = await fetch(url, {...opts, headers:{"Authorization":"Key "+key, "Content-Type":"application/json", ...(opts.headers||{})}});
+  let body = null; try{ body = await r.json(); }catch{}
+  if(!r.ok){
+    let msg = body && (typeof body.detail==="string" ? body.detail : body.detail ? JSON.stringify(body.detail) : body.message || body.error);
+    if(r.status===401) msg = "La chiave API non è valida. Controllala in alto a destra.";
+    else if(r.status===403) msg = (msg||"") + "\nPotrebbe essere finito il credito: controlla su fal.ai/dashboard/billing.";
+    else if(r.status===404) msg = "Modello non trovato: controlla l'ID del modello.";
+    throw new Error(msg || ("Errore "+r.status));
+  }
+  return body;
+}
+function extractMedia(out){
+  const found = [];
+  const walk = (v)=>{
+    if(!v) return;
+    if(Array.isArray(v)) return v.forEach(walk);
+    if(typeof v==="object"){
+      if(typeof v.url==="string"){
+        const ct = v.content_type||""; const u=v.url;
+        const isVid = ct.startsWith("video") || /\.(mp4|webm|mov)(\?|$)/i.test(u);
+        const isImg = ct.startsWith("image") || /\.(png|jpe?g|webp|gif)(\?|$)/i.test(u);
+        if(isVid||isImg){ found.push({url:u, kind:isVid?"video":"image"}); return; }
+      }
+      Object.values(v).forEach(walk);
+    }
+  };
+  walk(out); return found;
+}
+
+$("form").onsubmit = async (e)=>{
+  e.preventDefault();
+  const err = $("formErr"); err.hidden = true;
+  if(!key){ $("sheet").hidden=false; return; }
+  const p = preset();
+  const prompt = $("prompt").value.trim();
+  if(!prompt){ err.textContent="Scrivi cosa vuoi creare."; err.hidden=false; return; }
+  const f = {prompt, ratio:state.ratio[state.mode], dur:state.dur, image: p.ref||p.id==="custom" ? state.image : null};
+  let endpoint, input;
+  if(p.id==="custom"){
+    endpoint = $("custom").value.trim().replace(/^https?:\/\/(fal\.ai\/models\/|queue\.fal\.run\/|fal\.run\/)/,"").replace(/\/+$/,"");
+    if(!endpoint){ err.textContent="Inserisci l'ID del modello."; err.hidden=false; return; }
+    input = {prompt, aspect_ratio:f.ratio};
+    if(state.mode==="video") input.duration = state.dur;
+    if(f.image){ input.image_url = f.image; }
+  } else {
+    if(p.needsImage && !f.image){ err.textContent="Questo modello ha bisogno di una foto di partenza: sceglila dal Rullino."; err.hidden=false; return; }
+    endpoint = f.image && p.ref ? p.ref : p.t;
+    input = p.build(f);
+  }
+  const extraTxt = $("extra").value.trim();
+  if(extraTxt){ try{ Object.assign(input, JSON.parse(extraTxt)); }catch{ err.textContent="I parametri avanzati non sono JSON valido."; err.hidden=false; return; } }
+
+  $("go").disabled = true;
+  try{
+    const sub = await fal("https://queue.fal.run/"+endpoint, {method:"POST", body:JSON.stringify(input)});
+    const job = {id:sub.request_id, endpoint, mode:state.mode, prompt, created:Date.now(), status:"IN_QUEUE",
+      status_url:sub.status_url, response_url:sub.response_url, cancel_url:sub.cancel_url, media:[]};
+    jobs.unshift(job); save(); renderJobs(); poll(job);
+    toast("Inviato a fal.ai");
+  }catch(ex){ err.textContent = ex.message; err.hidden=false; }
+  finally{ $("go").disabled = false; }
+};
+
+function save(){ store.set("jobs", jobs.slice(0,60)); }
+const polling = new Set();
+async function poll(job){
+  if(polling.has(job.id)) return; polling.add(job.id);
+  try{
+    while(job.status!=="COMPLETED" && job.status!=="FAILED" && job.status!=="CANCELLED"){
+      await new Promise(r=>setTimeout(r, job.mode==="video"?4000:1500));
+      try{
+        const s = await fal(job.status_url);
+        job.status = s.status; job.pos = s.queue_position;
+      }catch(ex){ job.status="FAILED"; job.error=ex.message; }
+      save(); renderJob(job);
+    }
+    if(job.status==="COMPLETED"){
+      try{
+        const out = await fal(job.response_url);
+        job.media = extractMedia(out);
+        if(!job.media.length) job.error = "Finito, ma non ho trovato immagini o video nella risposta.";
+      }catch(ex){ job.status="FAILED"; job.error=ex.message; }
+      save(); renderJob(job);
+    }
+  } finally { polling.delete(job.id); }
+}
+
+/* ---------- Results ---------- */
+const LABEL = {IN_QUEUE:"In coda", IN_PROGRESS:"Sto generando", COMPLETED:"Pronto", FAILED:"Non riuscito", CANCELLED:"Annullato"};
+function elapsed(t){ const s=Math.round((Date.now()-t)/1000); return s<60? s+" s" : Math.floor(s/60)+" min "+(s%60)+" s"; }
+function renderJobs(){
+  const box = $("jobs"); box.innerHTML="";
+  if(!jobs.length){ box.innerHTML = '<div class="empty">Qui compariranno le immagini e i video che crei.<br>Collega fal.ai in alto, scrivi un\'idea e premi Genera.</div>'; return; }
+  for(const j of jobs){ const el=document.createElement("article"); el.className="job"; el.id="job-"+j.id; box.append(el); renderJob(j); }
+}
+function renderJob(j){
+  const el = $("job-"+j.id); if(!el) return;
+  const running = j.status==="IN_QUEUE"||j.status==="IN_PROGRESS";
+  let media = "";
+  if(j.media && j.media.length){
+    media = j.media.map(m=> m.kind==="video"
+      ? `<video src="${m.url}" controls playsinline loop preload="metadata"></video>`
+      : `<img src="${m.url}" alt="" loading="lazy">`).join("");
+  }
+  const status = running
+    ? `<span class="status"><span class="spin"></span>${LABEL[j.status]}${j.status==="IN_QUEUE"&&j.pos!=null?" · posto "+(j.pos+1):""} · ${elapsed(j.created)}</span>`
+    : `<span class="status" style="color:${j.status==="COMPLETED"?"var(--ok)":"var(--err)"}">${LABEL[j.status]||j.status}</span>`;
+  el.innerHTML = `${media?`<div class="media">${media}</div>`:""}
+    <div class="meta">
+      <p class="p"></p>
+      ${j.error?`<p class="err"></p>`:""}
+      <div class="row"><span class="tag"></span>${status}</div>
+      <div class="acts">
+        ${j.media&&j.media.length?`<button type="button" class="link" data-a="save">Salva</button>`:""}
+        <button type="button" class="link" data-a="reuse">Riusa prompt</button>
+        ${running?`<button type="button" class="link" data-a="cancel" style="color:var(--muted)">Annulla</button>`:`<button type="button" class="link" data-a="del" style="color:var(--muted)">Elimina</button>`}
+      </div>
+    </div>`;
+  el.querySelector(".p").textContent = j.prompt;
+  el.querySelector(".tag").textContent = j.endpoint;
+  if(j.error) el.querySelector(".err").textContent = j.error;
+  el.querySelectorAll("[data-a]").forEach(b=> b.onclick = ()=> act(j, b.dataset.a));
+}
+async function act(j, a){
+  if(a==="reuse"){ $("prompt").value=j.prompt; window.scrollTo({top:0,behavior:"smooth"}); }
+  if(a==="del"){ jobs = jobs.filter(x=>x!==j); save(); renderJobs(); }
+  if(a==="cancel"){
+    try{ await fal(j.cancel_url||j.status_url.replace(/\/status.*$/,"/cancel"), {method:"PUT"}); }catch{}
+    j.status="CANCELLED"; save(); renderJob(j);
+  }
+  if(a==="save"){
+    // iPhone: the share sheet offers "Salva immagine/video" straight into Photos.
+    try{
+      const files = await Promise.all(j.media.map(async (m,i)=>{
+        const b = await (await fetch(m.url)).blob();
+        const ext = (b.type.split("/")[1]||(m.kind==="video"?"mp4":"png")).split(";")[0];
+        return new File([b], `fal-${j.id.slice(0,8)}-${i+1}.${ext}`, {type:b.type});
+      }));
+      if(navigator.canShare && navigator.canShare({files})){ await navigator.share({files}); return; }
+      throw new Error("no-share");
+    }catch(ex){
+      if(ex && ex.name==="AbortError") return;
+      window.open(j.media[0].url, "_blank");
+      toast("Tieni premuto sull'immagine o sul video per salvarlo");
+    }
+  }
+}
+$("clearAll").onclick = ()=>{
+  const b=$("clearAll");
+  if(b.dataset.armed){ jobs = jobs.filter(j=>j.status==="IN_QUEUE"||j.status==="IN_PROGRESS"); save(); renderJobs(); delete b.dataset.armed; b.textContent="Svuota"; return; }
+  b.dataset.armed="1"; b.textContent="Tocca di nuovo per svuotare"; setTimeout(()=>{ delete b.dataset.armed; b.textContent="Svuota"; },3000);
+};
+
+/* Live timers for running jobs */
+setInterval(()=> jobs.forEach(j=>{ if(j.status==="IN_QUEUE"||j.status==="IN_PROGRESS") renderJob(j); }), 1000);
+
+renderKey(); renderForm(); renderJobs();
+if(key) jobs.forEach(j=>{ if(j.status==="IN_QUEUE"||j.status==="IN_PROGRESS") poll(j); });
+</script>
+</body>
+</html>
