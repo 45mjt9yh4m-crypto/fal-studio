@@ -164,13 +164,19 @@ details textarea{min-height:80px;margin-top:8px}
   <div class="in" role="dialog" aria-labelledby="sheetT">
     <h3 id="sheetT">Collega fal.ai</h3>
     <p class="hint">Sul sito fal.ai vai su <b>Dashboard → API Keys</b>, crea una chiave e incollala qui. Resta salvata solo su questo telefono.</p>
-    <input type="password" id="key" class="mono" placeholder="xxxxxxxx-xxxx-…:xxxxxxxx" autocapitalize="off" autocorrect="off" spellcheck="false">
+    <label>Chiave per generare (tipo <b>API</b>)
+      <input type="password" id="key" class="mono" placeholder="xxxxxxxx-xxxx-…:xxxxxxxx" autocapitalize="off" autocorrect="off" spellcheck="false">
+    </label>
+    <label>Chiave per vedere il credito (tipo <b>BILLING</b>, facoltativa)
+      <input type="password" id="bkey" class="mono" placeholder="xxxxxxxx-xxxx-…:xxxxxxxx" autocapitalize="off" autocorrect="off" spellcheck="false">
+    </label>
+    <p class="hint">fal.ai non lascia leggere il credito alla chiave che genera. Per vederlo nell'app crea una seconda chiave scegliendo il tipo <b>BILLING</b>: può solo leggere il credito, non può spendere.</p>
     <p class="hint"><a href="https://fal.ai/dashboard/keys" target="_blank" rel="noopener" style="color:var(--accent)">Apri le chiavi su fal.ai</a> · <a href="https://fal.ai/dashboard/billing" target="_blank" rel="noopener" style="color:var(--accent)">Vedi il credito</a></p>
     <div class="btns">
       <button type="button" id="keyCancel">Chiudi</button>
       <button type="button" id="keySave" class="primary">Salva</button>
     </div>
-    <button type="button" class="link" id="keyDel" style="color:var(--err);align-self:flex-start">Rimuovi la chiave</button>
+    <button type="button" class="link" id="keyDel" style="color:var(--err);align-self:flex-start">Rimuovi le chiavi</button>
   </div>
 </div>
 
@@ -182,27 +188,32 @@ details textarea{min-height:80px;margin-top:8px}
 const RATIO_SIZE = {"1:1":"square_hd","16:9":"landscape_16_9","9:16":"portrait_16_9","4:3":"landscape_4_3","3:4":"portrait_4_3"};
 const MODELS = {
   image: [
-    {id:"nano", name:"Nano Banana (Google) · modifica foto", t:"fal-ai/nano-banana", ref:"fal-ai/nano-banana/edit",
-      build:(f)=> f.image ? {prompt:f.prompt, image_urls:[f.image], num_images:1} : {prompt:f.prompt, num_images:1}},
-    {id:"flux-ultra", name:"FLUX 1.1 Pro Ultra · alta qualità", t:"fal-ai/flux-pro/v1.1-ultra", mp:4,
+    {id:"nano2", name:"Nano Banana 2 (Google) · anche modifica foto", t:"fal-ai/nano-banana-2", ref:"fal-ai/nano-banana-2/edit",
+      build:(f)=> f.image ? {prompt:f.prompt, image_urls:[f.image], aspect_ratio:"auto", num_images:1} : {prompt:f.prompt, aspect_ratio:f.ratio, num_images:1}},
+    {id:"nano", name:"Nano Banana (Google) · più economico", t:"fal-ai/nano-banana", ref:"fal-ai/nano-banana/edit",
+      build:(f)=> f.image ? {prompt:f.prompt, image_urls:[f.image], num_images:1} : {prompt:f.prompt, aspect_ratio:f.ratio, num_images:1}},
+    {id:"flux-ultra", name:"FLUX 1.1 Pro Ultra · alta qualità", t:"fal-ai/flux-pro/v1.1-ultra",
       build:(f)=>({prompt:f.prompt, aspect_ratio:f.ratio, num_images:1})},
-    {id:"flux-schnell", name:"FLUX Schnell · veloce ed economico", t:"fal-ai/flux/schnell",
+    {id:"flux-schnell", name:"FLUX Schnell · velocissimo, quasi gratis", t:"fal-ai/flux/schnell", mp:1,
       build:(f)=>({prompt:f.prompt, image_size:RATIO_SIZE[f.ratio]||"square_hd", num_images:1})},
     {id:"custom", name:"Altro modello…"}
   ],
   video: [
-    {id:"kling4", name:"Kling 4.0 · novità", t:"kling/v4/text-to-video", ref:"kling/v4/image-to-video",
-      durs:["5","10"], build:(f)=> f.image ? {prompt:f.prompt, image_url:f.image, duration:f.dur} : {prompt:f.prompt, aspect_ratio:f.ratio, duration:f.dur}},
-    {id:"h3max", name:"MiniMax H3 Max · novità", t:"minimax/h3-max/text-to-video", ref:"minimax/h3-max/image-to-video",
-      build:(f)=> f.image ? {prompt:f.prompt, image_url:f.image} : {prompt:f.prompt, aspect_ratio:f.ratio}},
-    {id:"flux3v", name:"FLUX 3 Max · anima una foto", ref:"blackforestlabs/flux-3-max/image-to-video", needsImage:true,
-      build:(f)=>({prompt:f.prompt, image_url:f.image})},
-    {id:"kling", name:"Kling 2.1 Master", t:"fal-ai/kling-video/v2.1/master/text-to-video", ref:"fal-ai/kling-video/v2.1/master/image-to-video",
-      durs:["5","10"], build:(f)=> f.image ? {prompt:f.prompt, image_url:f.image, duration:f.dur} : {prompt:f.prompt, aspect_ratio:f.ratio, duration:f.dur}},
-    {id:"seedance", name:"Seedance 1 Pro (ByteDance)", t:"fal-ai/bytedance/seedance/v1/pro/text-to-video", ref:"fal-ai/bytedance/seedance/v1/pro/image-to-video",
-      durs:["5","10"], build:(f)=> f.image ? {prompt:f.prompt, image_url:f.image, duration:f.dur} : {prompt:f.prompt, aspect_ratio:f.ratio, duration:f.dur}},
-    {id:"veo-fast", name:"Veo 3 Fast (Google) · con audio", t:"fal-ai/veo3/fast",
-      build:(f)=>({prompt:f.prompt, aspect_ratio:f.ratio})},
+    {id:"kling4", name:"Kling 4.0 · top qualità", t:"kling/v4/text-to-video", ref:"kling/v4/image-to-video",
+      durs:["5","10"], ratios:["9:16","16:9","1:1"],
+      build:(f)=> f.image ? {prompt:f.prompt, start_image_url:f.image, duration:+f.dur} : {prompt:f.prompt, aspect_ratio:f.ratio, duration:+f.dur}},
+    {id:"h3max", name:"MiniMax H3 Max", t:"minimax/h3-max/text-to-video", ref:"minimax/h3-max/image-to-video",
+      durs:["5","10"], ratios:["9:16","16:9","1:1"],
+      build:(f)=> f.image ? {prompt:f.prompt, image_url:f.image, duration:+f.dur} : {prompt:f.prompt, aspect_ratio:f.ratio, duration:+f.dur}},
+    {id:"h3turbo", name:"MiniMax H3 Max Turbo · il più economico", t:"minimax/h3-max-turbo/text-to-video", ref:"minimax/h3-max-turbo/image-to-video",
+      durs:["5","10"], ratios:["9:16","16:9","1:1"],
+      build:(f)=> f.image ? {prompt:f.prompt, image_url:f.image, duration:+f.dur} : {prompt:f.prompt, aspect_ratio:f.ratio, duration:+f.dur}},
+    {id:"flux3", name:"FLUX 3 Max · con audio", t:"blackforestlabs/flux-3-max/text-to-video", ref:"blackforestlabs/flux-3-max/image-to-video",
+      durs:["5","10"], ratios:["9:16","16:9","1:1"],
+      build:(f)=> f.image ? {prompt:f.prompt, image_url:f.image, duration:+f.dur} : {prompt:f.prompt, aspect_ratio:f.ratio, duration:+f.dur}},
+    {id:"omni", name:"Gemini Omni Flash (Google) · con audio", t:"google/gemini-omni-flash/v1.1/text-to-video", ref:"google/gemini-omni-flash/v1.1/image-to-video",
+      durs:["5","8"], ratios:["9:16","16:9"],
+      build:(f)=> f.image ? {prompt:f.prompt, image_url:f.image, aspect_ratio:f.ratio, duration:+f.dur} : {prompt:f.prompt, aspect_ratio:f.ratio, duration:+f.dur}},
     {id:"custom", name:"Altro modello…"}
   ]
 };
@@ -213,10 +224,12 @@ const store = {
   get(k,d){ try{ const v=localStorage.getItem(k); return v==null?d:JSON.parse(v); }catch{ return d; } },
   set(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch{} }
 };
-let key = store.get("falKey","");
+const cleanKey = (k)=> (k||"").trim().replace(/^key\s+/i,"").trim();
+let key = cleanKey(store.get("falKey",""));
+let bkey = cleanKey(store.get("falBillingKey",""));
 let jobs = store.get("jobs",[]);
 let state = {mode:store.get("mode","image"), model:{}, ratio:{}, dur:"5", image:null};
-state.model = store.get("modelSel",{image:"nano",video:"kling4"});
+state.model = store.get("modelSel",{image:"nano2",video:"kling4"});
 state.ratio = {image:"1:1", video:"9:16"};
 
 const $ = (id)=>document.getElementById(id);
@@ -224,11 +237,11 @@ const toast = (msg)=>{ const t=document.createElement("div"); t.className="toast
 
 /* ---------- Key sheet ---------- */
 function renderKey(){ $("keyDot").classList.toggle("on", !!key); $("keyLbl").textContent = key ? "Collegato" : "Collega fal.ai"; }
-$("openKey").onclick = ()=>{ $("key").value = key; $("sheet").hidden = false; };
+$("openKey").onclick = ()=>{ $("key").value = key; $("bkey").value = bkey; $("sheet").hidden = false; };
 $("keyCancel").onclick = ()=>{ $("sheet").hidden = true; };
 $("sheet").onclick = (e)=>{ if(e.target.id==="sheet") $("sheet").hidden = true; };
-$("keySave").onclick = ()=>{ key = $("key").value.trim(); store.set("falKey",key); renderKey(); updatePrice(); updateBalance(); $("sheet").hidden = true; toast(key?"Chiave salvata":"Nessuna chiave"); };
-$("keyDel").onclick = ()=>{ key=""; store.set("falKey",""); $("key").value=""; renderKey(); updateBalance(); toast("Chiave rimossa"); };
+$("keySave").onclick = ()=>{ key = cleanKey($("key").value); store.set("falKey",key); bkey = cleanKey($("bkey").value); store.set("falBillingKey",bkey); renderKey(); updatePrice(); updateBalance(); $("sheet").hidden = true; toast(key?"Chiave salvata":"Nessuna chiave"); };
+$("keyDel").onclick = ()=>{ key=""; bkey=""; store.set("falKey",""); store.set("falBillingKey",""); $("key").value=""; $("bkey").value=""; renderKey(); updateBalance(); toast("Chiave rimossa"); };
 
 /* ---------- Composer ---------- */
 function preset(){ return MODELS[state.mode].find(m=>m.id===state.model[state.mode]) || MODELS[state.mode][0]; }
@@ -242,7 +255,9 @@ function renderForm(){
   $("customWrap").hidden = p.id!=="custom";
   $("custom").value = store.get("custom_"+state.mode,"");
   const rs = $("ratios"); rs.innerHTML="";
-  for(const r of RATIOS[state.mode]){ const b=document.createElement("button"); b.type="button"; b.textContent=r; b.setAttribute("aria-pressed", state.ratio[state.mode]===r); b.onclick=()=>{state.ratio[state.mode]=r; renderForm();}; rs.append(b); }
+  const ratios = p.ratios || RATIOS[state.mode];
+  if(!ratios.includes(state.ratio[state.mode])) state.ratio[state.mode] = ratios[0];
+  for(const r of ratios){ const b=document.createElement("button"); b.type="button"; b.textContent=r; b.setAttribute("aria-pressed", state.ratio[state.mode]===r); b.onclick=()=>{state.ratio[state.mode]=r; renderForm();}; rs.append(b); }
   const durs = p.durs || null;
   $("durWrap").hidden = !durs;
   if(durs){ if(!durs.includes(state.dur)) state.dur=durs[0]; const ds=$("durs"); ds.innerHTML="";
@@ -262,9 +277,16 @@ let balance = null;
 async function updateBalance(){
   const box=$("bal"), v=$("balVal");
   if(!key){ box.hidden=true; balance=null; checkAfford(); return; }
-  box.hidden=false; v.textContent="…";
+  box.hidden=false;
+  if(!bkey){
+    balance=null; v.innerHTML='<button type="button" class="link" style="font-size:14px">Mostra il credito</button>';
+    v.querySelector("button").onclick = ()=> $("openKey").click();
+    checkAfford(); return;
+  }
+  v.textContent="…";
   try{
-    const r = await fetch("https://api.fal.ai/v1/account/billing?expand=credits", {headers:{"Authorization":"Key "+key}});
+    const r = await fetch("https://api.fal.ai/v1/account/billing?expand=credits", {headers:{"Authorization":"Key "+bkey}});
+    if(r.status===401||r.status===403){ balance=null; v.innerHTML='<span style="font-size:13px;color:var(--err)">chiave credito non valida o non di tipo BILLING</span>'; checkAfford(); return; }
     if(!r.ok) throw new Error(r.status);
     const d = await r.json();
     const c = d.credits || d;
@@ -318,11 +340,11 @@ async function updatePrice(){
     if(seq!==priceSeq) return;
     const unit = (pr.unit||"").toLowerCase(), u = Number(pr.unit_price);
     let qty = 1, how = "", approx = false;
-    if(unit.includes("second")){ qty = Number(state.mode==="video" ? state.dur : 1) || 5; how = `${money(u)} al secondo × ${qty} s`; approx = !(p.durs); }
+    if(unit.includes("second")){ qty = Number(state.mode==="video" ? state.dur : 5) || 5; how = `${money(u)} al secondo × ${qty} s`; approx = true; }
     else if(unit.includes("megapixel")){ qty = p.mp || 1; approx = true; how = `${money(u)} a megapixel × ~${qty} MP`; }
     else if(unit.includes("image")){ how = `${money(u)} a immagine`; }
     else if(unit.includes("video")){ how = `${money(u)} a video`; }
-    else { how = `${money(u)} per ${pr.unit||"richiesta"}`; approx = true; }
+    else throw new Error("unità non stimabile: "+pr.unit);
     currentCost = u*qty;
     txt.innerHTML = ""; txt.append("Costo stimato"); const sm=document.createElement("small"); sm.textContent = " · "+how; txt.append(sm);
     val.textContent = (approx?"≈ ":"") + money(currentCost) + (pr.currency && pr.currency!=="USD" ? " "+pr.currency : "");
@@ -330,7 +352,7 @@ async function updatePrice(){
     checkAfford();
   }catch{
     if(seq!==priceSeq) return;
-    txt.innerHTML = `Prezzo non disponibile · <a style="color:var(--accent)" target="_blank" rel="noopener" href="https://fal.ai/models/${encodeURI(endpoint)}">vedi su fal.ai</a>`;
+    txt.innerHTML = `Prezzo non calcolabile qui · <a style="color:var(--accent)" target="_blank" rel="noopener" href="https://fal.ai/models/${encodeURI(endpoint)}">vedi su fal.ai</a>`;
     val.textContent = "?";
   }
 }
@@ -433,6 +455,7 @@ async function poll(job){
       try{
         const s = await fal(job.status_url);
         job.status = s.status; job.pos = s.queue_position;
+        if(s.status==="COMPLETED" && s.error){ job.status="FAILED"; job.error = s.error; }
       }catch(ex){ job.status="FAILED"; job.error=ex.message; }
       save(); renderJob(job);
     }
@@ -483,6 +506,17 @@ function renderJob(j){
   el.querySelector(".tag").textContent = j.endpoint + (j.cost!=null ? " · ≈ "+money(j.cost) : "");
   if(j.error) el.querySelector(".err").textContent = j.error;
   el.querySelectorAll("[data-a]").forEach(b=> b.onclick = ()=> act(j, b.dataset.a));
+  if(j.status==="COMPLETED" && j.media && j.media.length && j===jobs[0]) prefetch(j);
+}
+const fileCache = {};
+async function prefetch(j){
+  if(!j.media || !j.media.length) return null;
+  const k = j.id; if(fileCache[k]) return fileCache[k];
+  return fileCache[k] = Promise.all(j.media.map(async (m,i)=>{
+    const b = await (await fetch(m.url)).blob();
+    const ext = (b.type.split("/")[1]||(m.kind==="video"?"mp4":"png")).split(";")[0];
+    return new File([b], `fal-${j.id.slice(0,8)}-${i+1}.${ext}`, {type:b.type});
+  })).then(files=>{ fileCache[k]={files}; return fileCache[k]; }).catch(()=>{ delete fileCache[k]; return null; });
 }
 async function act(j, a){
   if(a==="reuse"){ $("prompt").value=j.prompt; window.scrollTo({top:0,behavior:"smooth"}); }
@@ -492,21 +526,20 @@ async function act(j, a){
     j.status="CANCELLED"; save(); renderJob(j);
   }
   if(a==="save"){
-    // iPhone: the share sheet offers "Salva immagine/video" straight into Photos.
-    try{
-      const files = await Promise.all(j.media.map(async (m,i)=>{
-        const b = await (await fetch(m.url)).blob();
-        const ext = (b.type.split("/")[1]||(m.kind==="video"?"mp4":"png")).split(";")[0];
-        return new File([b], `fal-${j.id.slice(0,8)}-${i+1}.${ext}`, {type:b.type});
-      }));
-      if(navigator.canShare && navigator.canShare({files})){ await navigator.share({files}); return; }
-      throw new Error("no-share");
-    }catch(ex){
-      if(ex && ex.name==="AbortError") return;
-      window.open(j.media[0].url, "_blank");
-      toast("Tieni premuto sull'immagine o sul video per salvarlo");
+    const c = fileCache[j.id];
+    if(c && c.files){
+      if(navigator.canShare && navigator.canShare({files:c.files})){
+        try{ await navigator.share({files:c.files}); }catch(ex){ if(ex.name!=="AbortError") openMedia(j); }
+      } else openMedia(j);
+      return;
     }
+    toast("Preparo il file… tocca di nuovo Salva tra un attimo");
+    const r = await prefetch(j); if(!r) openMedia(j);
   }
+}
+function openMedia(j){
+  const a=document.createElement("a"); a.href=j.media[0].url; a.target="_blank"; a.rel="noopener"; document.body.append(a); a.click(); a.remove();
+  toast("Tieni premuto sull'immagine o sul video per salvarlo");
 }
 $("clearAll").onclick = ()=>{
   const b=$("clearAll");
