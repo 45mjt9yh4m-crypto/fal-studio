@@ -160,6 +160,8 @@ details textarea{min-height:80px;margin-top:8px}
   </section>
 </div>
 
+<p class="hint" style="text-align:center;margin-top:8px">Versione 1.3 · <button type="button" class="link" id="reloadApp" style="font-size:13px">Aggiorna app</button></p>
+
 <div class="sheet" id="sheet" hidden>
   <div class="in" role="dialog" aria-labelledby="sheetT">
     <h3 id="sheetT">Collega fal.ai</h3>
@@ -385,13 +387,64 @@ async function fal(url, opts={}){
   const r = await fetch(url, {...opts, headers:{"Authorization":"Key "+key, "Content-Type":"application/json", ...(opts.headers||{})}});
   let body = null; try{ body = await r.json(); }catch{}
   if(!r.ok){
-    let msg = body && (typeof body.detail==="string" ? body.detail : body.detail ? JSON.stringify(body.detail) : body.message || body.error);
+    let msg = body && (typeof body.detail==="string" ? body.detail : Array.isArray(body.detail) ? readable(body.detail) : body.detail ? JSON.stringify(body.detail).slice(0,300) : body.message || (body.error && (body.error.message || body.error)));
     if(r.status===401) msg = "La chiave API non è valida. Controllala in alto a destra.";
     else if(r.status===403) msg = (msg||"") + "\nPotrebbe essere finito il credito: controlla su fal.ai/dashboard/billing.";
     else if(r.status===404) msg = "Modello non trovato: controlla l'ID del modello.";
     throw new Error(msg || ("Errore "+r.status));
   }
   return body;
+}
+function readable(list){
+  return list.map(e=>{
+    const field = (e.loc||[]).filter(x=>x!=="body").join(".") || "richiesta";
+    if(e.type==="missing") return `Manca il campo "${field}" richiesto dal modello.`;
+    if(/enum|literal/.test(e.type||"")) return `Valore non accettato per "${field}"${e.ctx&&e.ctx.expected?": usa "+e.ctx.expected:""}.`;
+    return `"${field}": ${e.msg||e.type}`;
+  }).join("\n");
+}
+/* For "Altro modello…": read the model's input schema so the photo, duration and format go in the right fields */
+const schemaCache = {};
+async function inputSchema(endpoint){
+  if(schemaCache[endpoint]) return schemaCache[endpoint];
+  const r = await fetch("https://api.fal.ai/v1/models?expand=openapi-3.0&endpoint_id="+encodeURIComponent(endpoint));
+  const d = await r.json(); const o = d.models && d.models[0] && d.models[0].openapi;
+  if(!o || !o.paths) throw new Error("schema");
+  const sch = (o.components||{}).schemas||{};
+  for(const v of Object.values(o.paths)){
+    const ref = v.post && v.post.requestBody && v.post.requestBody.content["application/json"].schema.$ref;
+    if(ref) return schemaCache[endpoint] = sch[ref.split("/").pop()];
+  }
+  throw new Error("schema");
+}
+async function buildCustom(endpoint, f){
+  const input = {prompt:f.prompt};
+  let props = null;
+  try{ props = (await inputSchema(endpoint)).properties || null; }catch{}
+  if(!props){ // schema not available: best guess
+    input.aspect_ratio = f.ratio;
+    if(state.mode==="video") input.duration = +f.dur;
+    if(f.image){ if(/kling\/v4|kling-video\/o3/.test(endpoint)) input.start_image_url = f.image; else input.image_url = f.image; }
+    return input;
+  }
+  const enumOf = (k)=>{ const v=props[k]; if(!v) return null; if(v.enum) return v.enum; for(const x of (v.anyOf||[]).concat(v.allOf||[])) if(x.enum) return x.enum; return null; };
+  if(props.aspect_ratio){ const e=enumOf("aspect_ratio"); if(!e || e.includes(f.ratio)) input.aspect_ratio = f.ratio; }
+  else if(props.image_size && !f.image) input.image_size = RATIO_SIZE[f.ratio] || "square_hd";
+  if(props.duration && state.mode==="video"){
+    const e = enumOf("duration"), d = props.duration;
+    const t = d.type || (e && typeof e[0]);
+    let val = (t==="string") ? String(f.dur) : +f.dur;
+    if(e && !e.includes(val)){ const alt = e.find(x=>String(x).replace("s","")===String(f.dur)); val = alt!==undefined ? alt : d.default; }
+    if(val!==undefined) input.duration = val;
+  }
+  if(f.image){
+    if(props.start_image_url) input.start_image_url = f.image;
+    else if(props.image_url) input.image_url = f.image;
+    else if(props.image_urls) input.image_urls = [f.image];
+    else if(props.first_frame_url) input.first_frame_url = f.image;
+    else input.image_url = f.image;
+  }
+  return input;
 }
 function extractMedia(out){
   const found = [];
@@ -423,9 +476,8 @@ $("form").onsubmit = async (e)=>{
   if(p.id==="custom"){
     endpoint = currentEndpoint();
     if(!endpoint){ err.textContent="Inserisci l'ID del modello."; err.hidden=false; return; }
-    input = {prompt, aspect_ratio:f.ratio};
-    if(state.mode==="video") input.duration = state.dur;
-    if(f.image){ input.image_url = f.image; }
+    $("go").disabled = true;
+    try{ input = await buildCustom(endpoint, f); } finally { $("go").disabled = false; }
   } else {
     if(p.needsImage && !f.image){ err.textContent="Questo modello ha bisogno di una foto di partenza: sceglila dal Rullino."; err.hidden=false; return; }
     endpoint = currentEndpoint();
@@ -550,6 +602,7 @@ $("clearAll").onclick = ()=>{
 /* Live timers for running jobs */
 setInterval(()=> jobs.forEach(j=>{ if(j.status==="IN_QUEUE"||j.status==="IN_PROGRESS") renderJob(j); }), 1000);
 
+$("reloadApp").onclick = ()=> location.replace(location.pathname + "?v=" + Date.now());
 renderKey(); renderForm(); renderJobs(); updateBalance();
 document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) updateBalance(); });
 if(key) jobs.forEach(j=>{ if(j.status==="IN_QUEUE"||j.status==="IN_PROGRESS") poll(j); });
